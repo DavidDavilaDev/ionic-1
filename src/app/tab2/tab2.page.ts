@@ -1,51 +1,43 @@
-import { Component } from '@angular/core';
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { AngularFireStorage } from '@angular/fire/compat/storage';
-import { finalize } from 'rxjs/operators';
-import { v4 as uuidv4 } from 'uuid';
+import { Component, OnInit } from '@angular/core';
+import { PhotoService } from '../servicio/photo.service';
 
 @Component({
   selector: 'app-tab2',
   templateUrl: 'tab2.page.html',
   styleUrls: ['tab2.page.scss']
 })
-export class Tab2Page {
-
+export class Tab2Page implements OnInit {
   photos: string[] = [];
-  constructor(private storage: AngularFireStorage) {}
+  showPhotos: boolean = false;
 
-  async takePhoto() {
-    const image = await Camera.getPhoto({
-      quality: 90,
-      allowEditing: false,
-      resultType: CameraResultType.DataUrl,
-      source: CameraSource.Camera
-    });
+  constructor(private photoService: PhotoService) {}
 
-    const blob = this.dataUrlToBlob(image.dataUrl!);
-    const filePath = `photos/${uuidv4()}.jpeg`;
-    const fileRef = this.storage.ref(filePath);
-    const task = this.storage.upload(filePath, blob);
-
-    task.snapshotChanges().pipe(
-      finalize(() => {
-        fileRef.getDownloadURL().subscribe(url => {
-          this.photos.push(url);
-        });
-      })
-    ).subscribe();
+  async ngOnInit() {
+    this.loadPhotos();
   }
-  dataUrlToBlob(dataUrl: string): Blob {
-    const byteString = atob(dataUrl.split(',')[1]);
-    const mimeString = dataUrl.split(',')[0].split(':')[1].split(';')[0];
-    const ab = new ArrayBuffer(byteString.length);
-    const ia = new Uint8Array(ab);
-    for (let i = 0; i < byteString.length; i++) {
-      ia[i] = byteString.charCodeAt(i);
+
+  loadPhotos() {
+    this.photoService.listPhotos().subscribe((urls: string[]) => {
+      this.photos = urls;
+    });
+  }
+
+  takePhoto() {
+    this.photoService.addPhoto();
+    // Re-load photos after adding a new one
+    this.loadPhotos();
+  }
+
+  deletePhoto(url: string) {
+    this.photoService.deletePhoto(url);
+    // Re-load photos after deleting one
+    this.loadPhotos();
+  }
+
+  togglePhotos() {
+    this.showPhotos = !this.showPhotos;
+    if (this.showPhotos) {
+      this.loadPhotos();
     }
-    return new Blob([ab], { type: mimeString });
   }
 }
-  
-
-
